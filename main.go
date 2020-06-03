@@ -27,6 +27,8 @@ type config struct {
 	directory        string
 	mode             string // once | always
 	nodeName         string
+	podName          string
+	podNamespace     string
 	kubeconfig       string
 	deleteStaleFiles bool
 }
@@ -91,6 +93,12 @@ func (n *nodeLabelsToFiles) parseFlags() error {
 	}
 	if nodeName := os.Getenv("NODENAME"); nodeName != "" {
 		n.config.nodeName = nodeName
+	}
+	if podName := os.Getenv("POD_NAME"); podName != "" {
+		n.config.podName = podName
+	}
+	if podNamespace := os.Getenv("POD_NAMESPACE"); podNamespace != "" {
+		n.config.podNamespace = podNamespace
 	}
 	if directory := os.Getenv("DIRECTORY"); directory != "" {
 		n.config.directory = directory
@@ -218,11 +226,38 @@ func (n *nodeLabelsToFiles) getNodeLabels() (map[string]string, error) {
 	return node.GetLabels(), nil
 }
 
+func (n *nodeLabelsToFiles) setPodLabels(labels map[string]string) error {
+	pod, err := n.clientset.CoreV1().Pods(n.config.podNamespace).Get(n.config.podName,
+		metav1.GetOptions{})
+	if err != nil {
+		klog.Infof("Failed: Creating pod labels: %s, with content: %s : %s", n.config.podName, n.config.podNamespace, err)
+		return err
+	}
+	objLabels := pod.GetLabels()
+	if objLabels == nil {
+		objLabels = make(map[string]string)
+	}
+
+	for key, value := range labels {
+		objLabels[key] = value
+	}
+	pod.SetLabels(objLabels)
+	klog.Infof("Creating pod labels: %s, with content: %s", n.config.podName, objLabels)
+	//updatedPod, err := n.clientset.CoreV1().Pods(n.config.podNamespace).Update(context.TODO(), &pod, metav1.UpdateOptions{})
+	_, err = n.clientset.CoreV1().Pods(n.config.podNamespace).Update(pod)
+	if err != nil {
+		klog.Infof("Failed: Creating pod labels: %s, with content: %s : %s", n.config.podName, n.config.podNamespace, err)
+		return err
+	}
+	return nil
+}
+
 func (n *nodeLabelsToFiles) processOnce(labels map[string]string) {
 	klog.V(2).Info("Refreshing Labels information for: ", n.config.nodeName)
 	klog.V(2).Infof("Retrieved labels: %v for node: %s", labels,
 		n.config.nodeName)
 	n.createFileFromLabels(labels)
+	n.setPodLabels(labels)
 	var err error
 	if n.config.deleteStaleFiles {
 		err = n.deleteStaleFiles(labels)

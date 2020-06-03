@@ -6,8 +6,8 @@ ENV GO111MODULE=on
 RUN go get honnef.co/go/tools/cmd/staticcheck
 
 ENV GOFLAGS=-mod=vendor
-COPY . /go/src/github.com/bjhaid/node-labels-to-files
-WORKDIR /go/src/github.com/bjhaid/node-labels-to-files
+COPY . /go/src/github.com/mcastelino/node-labels-to-files
+WORKDIR /go/src/github.com/mcastelino/node-labels-to-files
 
 RUN go test \
   && staticcheck . \
