@@ -25,7 +25,4 @@ jobs:
       # Runs a set of commands using the runners shell
       - name: Run a multi-line script
         run: |
-          echo "Build the container image",
-          docker build . --file Dockerfile --tag mcastelino/node-labels-to-files:latest,
-          echo "Publish to github container registry",
-          echo test, and deploy your project.
+          docker build . --file Dockerfile --tag mcastelino/node-labels-to-files:latest
