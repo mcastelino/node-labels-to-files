@@ -1,7 +1,7 @@
 ## node-labels-to-files
 
-[![Build Status](https://api.travis-ci.org/bjhaid/node-labels-to-files.svg?branch=master)](https://travis-ci.org/bjhaid/node-labels-to-files)
-[![Docker Pulls](https://img.shields.io/docker/pulls/bjhaid/node-labels-to-files.svg)](https://github.com/bjhaid/node-labels-to-files)
+Derived from bjhaid/node-labels-to-files. This will not only generate the files with lables. Each pod labels itself with the node lables. This allows telemetry to track node labels over time. 
+
 
 This is mainly [Tim Hockin's
 idea](https://docs.google.com/document/d/1fH64mEfZH597luup-ZBfBNkiTVjfoFYGEa-G1G_TM6A/edit#heading=h.1fewofmjczp2), I just implemented it.
@@ -26,6 +26,8 @@ node-labels-to-files as a sidecar.
 By default it will delete files that are stale or that it does not know about,
 to prevent this please make sure you have the `-delete-stale-files` flag set
 to false
+
+It also labels the pod with the labels of the node it is running on.
 
 ### Usage
 
