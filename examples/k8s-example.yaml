@@ -86,7 +86,7 @@ spec:
               fieldPath: metadata.annotations
   containers:
   - name: node-labels-to-files
-    image: node-labels-to-files
+    image: ghcr.io/mcastelino/node-labels-to-files:v0.1
     imagePullPolicy: Always
     command:
       - /usr/bin/node-labels-to-files
