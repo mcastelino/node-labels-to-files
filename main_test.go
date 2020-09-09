@@ -32,6 +32,8 @@ func TestParseFlags(t *testing.T) {
 		os.Setenv("NODENAME", nodeName)
 		directory := "/etc/node-labels-to-files"
 		os.Setenv("DIRECTORY", directory)
+		nodeMetadata := "/tmp/nlf-nodeMetadata"
+		os.Setenv("NODE_METADATA", nodeMetadata)
 		mode := Once
 		os.Setenv("MODE", mode)
 		os.Setenv("DELETE_STALE_FILES", "false")
@@ -48,6 +50,10 @@ func TestParseFlags(t *testing.T) {
 		if n.config.directory != directory {
 			t.Errorf("Expected directory to be '%s', got; %v",
 				directory, n.config.directory)
+		}
+		if n.config.nodeMetadata != nodeMetadata {
+			t.Errorf("Expected nodeMetadata to be '%s', got; %v",
+				directory, n.config.nodeMetadata)
 		}
 		if n.config.mode != mode {
 			t.Errorf("Expected mode to be '%s', got; %v",
@@ -192,22 +198,29 @@ func TestFilesToDelete(t *testing.T) {
 
 func TestValdate(t *testing.T) {
 	t.Run("Happy Path", func(t *testing.T) {
-		config := &config{mode: Always, nodeName: "aRealNode", directory: "test"}
+		config := &config{mode: Always, nodeName: "aRealNode", directory: "test", nodeMetadata: "meta"}
 		err := config.Validate()
 		if err != nil {
 			t.Errorf("Expected no error got: %s", err)
 		}
 	})
 	t.Run("Directory Not Provided", func(t *testing.T) {
-		config := &config{mode: Always, nodeName: "aRealNode"}
+		config := &config{mode: Always, nodeName: "aRealNode", nodeMetadata: "meta"}
 		err := config.Validate()
 		expectedError := "directory is not configured"
 		if err == nil || err.Error() != expectedError {
 			t.Errorf("Expected: %s, got: %v", expectedError, err)
 		}
 	})
+	t.Run("Happy Path", func(t *testing.T) {
+		config := &config{mode: Always, nodeName: "aRealNode", directory: "test", nodeMetadata: "meta"}
+		err := config.Validate()
+		if err != nil {
+			t.Errorf("Expected no error got: %s", err)
+		}
+	})
 	t.Run("nodeName Not Provided", func(t *testing.T) {
-		config := &config{mode: Always, directory: "test"}
+		config := &config{mode: Always, directory: "test", nodeMetadata: "meta"}
 		err := config.Validate()
 		expectedError := "nodename is not configured"
 		if err == nil || err.Error() != expectedError {
@@ -215,7 +228,7 @@ func TestValdate(t *testing.T) {
 		}
 	})
 	t.Run("mode Not Provided", func(t *testing.T) {
-		config := &config{nodeName: "foo", directory: "test"}
+		config := &config{nodeName: "foo", directory: "test", nodeMetadata: "meta"}
 		err := config.Validate()
 		expectedError := "mode is not configured"
 		if err == nil || err.Error() != expectedError {
@@ -223,7 +236,7 @@ func TestValdate(t *testing.T) {
 		}
 	})
 	t.Run("wrong mode provided", func(t *testing.T) {
-		config := &config{mode: "Wrong", nodeName: "foo", directory: "test"}
+		config := &config{mode: "Wrong", nodeName: "foo", directory: "test", nodeMetadata: "meta"}
 		err := config.Validate()
 		expectedError := "mode should be one of once or always"
 		if err == nil || err.Error() != expectedError {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -25,12 +26,14 @@ const (
 
 type config struct {
 	directory        string
+	nodeMetadata     string
 	mode             string // once | always
 	nodeName         string
 	podName          string
 	podNamespace     string
 	kubeconfig       string
 	deleteStaleFiles bool
+	relabelPod       bool
 }
 
 type nodeLabelsToFiles struct {
@@ -42,8 +45,8 @@ func (c *config) Validate() error {
 	if c.directory == "" {
 		return errors.New("directory is not configured")
 	}
-	if c.directory == "" {
-		return errors.New("directory is not configured")
+	if c.nodeMetadata == "" {
+		return errors.New("nodeMetadata is not configured")
 	}
 	if c.nodeName == "" {
 		return errors.New("nodename is not configured")
@@ -70,13 +73,22 @@ func (n *nodeLabelsToFiles) parseFlags() error {
 				"environment variable KUBECONFIG")
 	}
 	flag.BoolVar(&(n.config.deleteStaleFiles), "delete-stale-files", true,
-		"This determines if node-labels-to-path will delete stale files or "+
+		"This determines if node-labels-to-files will delete stale files or "+
 			"files it is not aware of or keep them, by default it will delete "+
 			"them. Can be overriden via the environment variable DELETE_STALE_FILES")
-	flag.StringVar(&(n.config.directory), "directory", "", "Directory to "+
+	flag.BoolVar(&(n.config.relabelPod), "relabel-pod", true,
+		"This determines if node-labels-to-file will relabel the pod with node labels or "+
+			"or keep the original pod labels, by default it will relabel "+
+			"If the pod does not need to be relabled the permissions can be reduced"+
+			"Can be overriden via the environment variable RELABEL_POD")
+	flag.StringVar(&(n.config.directory), "directory", "/tmp/labels", "Directory to "+
 		"write the node labels in, if the directory does not exist "+
 		"node-labels-to-files will create it. Can be overridden via the "+
 		"environment variable DIRECTORY")
+	flag.StringVar(&(n.config.nodeMetadata), "nodeMetadata", "/tmp/nodeMetadata/nodeMetadata.ndjson", "File to "+
+		"write the pod and node labels to, if the directory does not exist "+
+		"node-labels-to-files will create it. Can be overridden via the "+
+		"environment variable NODE_METADATA")
 	flag.StringVar(&(n.config.mode), "mode", Always, "This determines "+
 		"the mode n works in, when it is set to once it retrieves the node "+
 		"labels and exits, if set to always it creates a watch on the node and "+
@@ -103,12 +115,20 @@ func (n *nodeLabelsToFiles) parseFlags() error {
 	if directory := os.Getenv("DIRECTORY"); directory != "" {
 		n.config.directory = directory
 	}
+	if nodeMetadata := os.Getenv("NODE_METADATA"); nodeMetadata != "" {
+		n.config.nodeMetadata = nodeMetadata
+	}
 	if mode := os.Getenv("MODE"); mode != "" {
 		n.config.mode = mode
 	}
 	if deleteStaleFiles := os.Getenv("DELETE_STALE_FILES"); deleteStaleFiles != "" {
 		if deleteStaleFiles == "false" {
 			n.config.deleteStaleFiles = false
+		}
+	}
+	if relabelPod := os.Getenv("RELABEL_POD"); relabelPod != "" {
+		if relabelPod == "false" {
+			n.config.relabelPod = false
 		}
 	}
 	return n.config.Validate()
@@ -243,7 +263,6 @@ func (n *nodeLabelsToFiles) setPodLabels(labels map[string]string) error {
 	}
 	pod.SetLabels(objLabels)
 	klog.Infof("Creating pod labels: %s, with content: %s", n.config.podName, objLabels)
-	//updatedPod, err := n.clientset.CoreV1().Pods(n.config.podNamespace).Update(context.TODO(), &pod, metav1.UpdateOptions{})
 	_, err = n.clientset.CoreV1().Pods(n.config.podNamespace).Update(pod)
 	if err != nil {
 		klog.Infof("Failed: Creating pod labels: %s, with content: %s : %s", n.config.podName, n.config.podNamespace, err)
@@ -252,12 +271,37 @@ func (n *nodeLabelsToFiles) setPodLabels(labels map[string]string) error {
 	return nil
 }
 
+func (n *nodeLabelsToFiles) setNodeMetadata(labels map[string]string) error {
+	objLabels := make(map[string]string)
+
+	// Only capture the non kubernetes generic labels
+	for key, value := range labels {
+		if !strings.Contains(key, "kubernetes.io") {
+			objLabels[key] = value
+		}
+	}
+
+	jsonString, err := json.Marshal(&objLabels)
+	if err != nil {
+		panic(err)
+	}
+	klog.V(5).Infof("Creating file: %s, with content: %s", n.config.nodeMetadata, jsonString)
+	err = writeToFile(n.config.nodeMetadata, string(jsonString))
+	if err != nil {
+		klog.Errorf("Failed creating file: %s, due to: %s", n.config.nodeMetadata, err)
+	}
+
+	return nil
+}
+
 func (n *nodeLabelsToFiles) processOnce(labels map[string]string) {
 	klog.V(2).Info("Refreshing Labels information for: ", n.config.nodeName)
-	klog.V(2).Infof("Retrieved labels: %v for node: %s", labels,
-		n.config.nodeName)
+	klog.V(2).Infof("Retrieved labels: %v for node: %s", labels, n.config.nodeName)
 	n.createFileFromLabels(labels)
-	n.setPodLabels(labels)
+	n.setNodeMetadata(labels)
+	if n.config.relabelPod {
+		n.setPodLabels(labels)
+	}
 	var err error
 	if n.config.deleteStaleFiles {
 		err = n.deleteStaleFiles(labels)

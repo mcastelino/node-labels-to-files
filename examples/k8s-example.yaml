@@ -32,8 +32,8 @@ rules:
   resources:
   - pods
   verbs:
-  - update
   - get
+  - update
 
 ---
 
@@ -86,7 +86,7 @@ spec:
               fieldPath: metadata.annotations
   containers:
   - name: node-labels-to-files
-    image: ghcr.io/mcastelino/node-labels-to-files:v0.1
+    image: ghcr.io/mcastelino/node-labels-to-files:v0.2
     imagePullPolicy: Always
     command:
       - /usr/bin/node-labels-to-files
@@ -95,10 +95,14 @@ spec:
     env:
       - name: DELETE_STALE_FILES
         value: "true"
+      - name: RELABEL_POD
+        value: "true"
       - name: MODE
         value: always
       - name: DIRECTORY
         value: /tmp/foo
+      - name: NODE_METADATA
+        value: /tmp/metadata/node-metadata.ndjson
       - name: NODENAME
         valueFrom:
           fieldRef:
