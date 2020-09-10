@@ -286,7 +286,8 @@ func (n *nodeLabelsToFiles) setNodeMetadata(labels map[string]string) error {
 		panic(err)
 	}
 	klog.V(5).Infof("Creating file: %s, with content: %s", n.config.nodeMetadata, jsonString)
-	err = writeToFile(n.config.nodeMetadata, string(jsonString))
+	//ndjson has to be newline terminated
+	err = writeToFile(n.config.nodeMetadata, string(jsonString)+"\n")
 	if err != nil {
 		klog.Errorf("Failed creating file: %s, due to: %s", n.config.nodeMetadata, err)
 	}
