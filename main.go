@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -38,6 +39,7 @@ type config struct {
 
 type nodeLabelsToFiles struct {
 	config    *config
+	labels    map[string]string
 	clientset *kubernetes.Clientset
 }
 
@@ -206,7 +208,7 @@ func (n *nodeLabelsToFiles) deleteStaleFiles(labels map[string]string) error {
 func (n *nodeLabelsToFiles) createFileFromLabels(labels map[string]string) {
 	for fileName, fileContent := range labels {
 		err := writeToFile(filepath.Join(n.config.directory, fileName),
-			fileContent)
+			fileContent, false)
 		klog.V(5).Infof("Creating file: %s, with content: %s", fileName, fileContent)
 		if err != nil {
 			klog.Errorf("Failed creating file: %s, due to: %s", fileName, err)
@@ -214,7 +216,7 @@ func (n *nodeLabelsToFiles) createFileFromLabels(labels map[string]string) {
 	}
 }
 
-func writeToFile(fileName string, fileContent string) error {
+func writeToFile(fileName string, fileContent string, append bool) error {
 	dir := filepath.Dir(fileName)
 	dirInfo, err := os.Stat(dir)
 	if err != nil || !dirInfo.IsDir() {
@@ -224,7 +226,14 @@ func writeToFile(fileName string, fileContent string) error {
 			return err
 		}
 	}
-	f, err := os.Create(fileName)
+
+	var f *os.File
+	if append {
+		f, err = os.OpenFile(fileName, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
+	} else {
+		f, err = os.Create(fileName)
+	}
+
 	if err != nil {
 		return err
 	}
@@ -285,9 +294,17 @@ func (n *nodeLabelsToFiles) setNodeMetadata(labels map[string]string) error {
 	if err != nil {
 		panic(err)
 	}
+
+	if reflect.DeepEqual(n.labels, labels) {
+		return nil
+	}
+
+	// Should we deepcopy?
+	n.labels = labels
+
 	klog.V(5).Infof("Creating file: %s, with content: %s", n.config.nodeMetadata, jsonString)
 	//ndjson has to be newline terminated
-	err = writeToFile(n.config.nodeMetadata, string(jsonString)+"\n")
+	err = writeToFile(n.config.nodeMetadata, string(jsonString)+"\n", true)
 	if err != nil {
 		klog.Errorf("Failed creating file: %s, due to: %s", n.config.nodeMetadata, err)
 	}
